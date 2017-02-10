@@ -1,20 +1,32 @@
 
 import mcgui.*;
+import java.sql.Timestamp;
 
 /**
  * Message implementation for ExampleCaster.
  *
  * @author Andreas Larsson &lt;larandr@chalmers.se&gt;
  */
-public class ExampleMessage extends Message {
+public class ExampleMessage extends Message implements Comparable<ExampleMessage> {
         
     String text;
-    int seq;
+    Timestamp timestamp;
+    boolean ack;
+    enum Status {READY,PENDING};
+    Status stat = Status.PENDING;
         
-    public ExampleMessage(int sender,int seq, String text) {
+    public ExampleMessage(int sender,String text,Timestamp ts) {
         super(sender);
         this.text = text;
-        this.seq = seq;
+        ack = false;
+        timestamp = ts;
+        
+    }
+
+    public ExampleMessage(int sender,String text, boolean ackn) {
+        super(sender);
+        this.text = text;
+        ack = ackn;
     }
     
     /**
@@ -25,6 +37,40 @@ public class ExampleMessage extends Message {
     public String getText() {
         return text;
     }
+    public void setAck(){
+      ack = true;
+    }
+    public void changeStatus(){
+      stat = Status.READY;
+    }
+
+    public boolean isAck(){
+      return ack;
+    }
+
+    public int getSender() {
+        return sender;
+    }
+
+    public Timestamp getTimeStamp(){
+      return timestamp;
+    }
+
+    public int compareTo(ExampleMessage msg) {
+      if( msg.getTimeStamp() == this.timestamp ) {
+        if(msg.getSender() < this.sender) {
+          return 1;
+        }
+        else
+          return -1;      
+      }
+      if(msg.getTimeStamp().before(this.timestamp))
+        return 1;
+      else
+        return -1;
+    }
+
+
     
     public static final long serialVersionUID = 0;
 }
