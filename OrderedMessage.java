@@ -16,7 +16,12 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     Status stat = Status.PENDING;
     int orgId;
     boolean[] ackArray;
-        
+     
+     
+    /**
+     *  Constructor for message carrying object of class OrderedMessage
+     *
+     */    
     public OrderedMessage(int sender, Timestamp ts, boolean[] ackArr, String text) {
         super(sender);
         this.text = text;
@@ -25,6 +30,10 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
         ackArray = ackArr;
     }
 
+    /**
+     *  Constructor for acknowledgement object of class OrderedMessage
+     *
+     */    
     public OrderedMessage(int sender, Timestamp originalTimestamp, int originalSender) {
         super(sender);
         orgId = originalSender;
@@ -40,30 +49,39 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     public String getText() {
         return text;
     }
-    public void setAck(){
-      ack = true;
+    
+    public void isAck(){
+        return ack;
     }
-    public void changeStatus(){
-      stat = Status.READY;
-    }
-
-    public boolean isAck(){
+    
+    /**
+     * Checks if a message is acknowledged by all hosts.
+     * Returns true if that is the case, otherwise false.
+     */
+    public boolean isAllAcked(){
       for(boolean ack : ackArray) {
         if(!ack)
           return false;
       }
       return true;
-        
     }
 
     public int getSender() {
         return sender;
+    }
+    
+    public int getOriginalSender(){
+        return orgId;
     }
 
     public Timestamp getTimeStamp(){
       return timestamp;
     }
 
+    /**
+     * Compares two OrderedMessage objects. Breaks ties
+     * in timestamp by id. Lower id first.
+     */
     @Override
     public int compareTo(OrderedMessage msg) {
       if( msg.getTimeStamp() == this.timestamp ) {
