@@ -12,8 +12,6 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     String text;
     Timestamp timestamp;
     boolean ack;
-    enum Status {READY,PENDING};
-    Status stat = Status.PENDING;
     int orgId;
     boolean[] ackArray;
      
