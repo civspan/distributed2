@@ -27,6 +27,7 @@ public class AckCaster extends Multicaster {
     public void cast(String messagetext) {
       Timestamp ts = new Timestamp(System.currentTimeMillis());
       boolean[] ackArray = ackArrayInit(hosts);
+      int index;
    // kanske bort   ackArray[id] = true;
       
       omsg = new OrderedMessage(id, ts, ackArray, messagetext);
@@ -59,20 +60,37 @@ public class AckCaster extends Multicaster {
     public void basicreceive(int peer, Message message) {      
         OrderedMessage ms = (OrderedMessage) message;
         // On receive, 
-        if(ms.isAck())
-          ms.changeStatus();
-        
+        if(ms.isAck()) {
+            
 
+                
+        }
+       
         //mcui.deliver(peer, ((OrderedMessage)message).text);
     }
     
-    public boolean[] ackArrayInit(int hosts){
-      boolean[] tmpArray = new boolean[hosts];
-      for(boolean ack : tmpArray)
-        ack = false;
-      return tmpArray;
+    public boolean[] ackArrayInit(int hosts) {
+        boolean[] tmpArray = new boolean[hosts];
+        for(boolean ack : tmpArray)
+          ack = false;
+        return tmpArray;
     }
 
+    /**
+     *  Searches the delivery list for a specified message. 
+     *  Returns the index if found, -1 if not.
+     *  @param msg  The message to look for
+     */
+    public int findMessage(OrderedMessage msg) {
+        int i = 0;
+        for( OrderedMessage listMsg : deliveryList ) {
+            if ( msg.compareTo(listMsg) == 0 )
+                return i;
+            i++;
+        }
+        return -1;
+    }
+    
     /**
      * Signals that a peer is down and has been down for a while to
      * allow for messages taking different paths from this peer to

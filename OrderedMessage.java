@@ -48,7 +48,7 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
         return text;
     }
     
-    public void isAck(){
+    public boolean isAck(){
         return ack;
     }
     
@@ -82,17 +82,18 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
      */
     @Override
     public int compareTo(OrderedMessage msg) {
-      if( msg.getTimeStamp() == this.timestamp ) {
-        if(msg.getSender() < this.sender) {
-          return 1;
+        if( msg.getTimeStamp() == this.timestamp ) {
+            if(msg.getSender() < this.sender) 
+              return 1;
+            else if(msg.getSender() > this.sender)
+                    return -1;      
+                 else
+                    return 0; // If timestamp and messages are the same, the objects are equal 
         }
+        if(msg.getTimeStamp().before(this.timestamp))
+            return 1;
         else
-          return -1;      
-      }
-      if(msg.getTimeStamp().before(this.timestamp))
-        return 1;
-      else
-        return -1;
+            return -1;
     }
 
 
