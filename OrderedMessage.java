@@ -12,7 +12,7 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     String text;
     Timestamp timestamp;
     boolean ack;
-    int orgId;
+    int ackSender;
     boolean[] ackArray;
      
      
@@ -20,23 +20,25 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
      *  Constructor for message carrying object of class OrderedMessage
      *
      */    
-    public OrderedMessage(int sender, Timestamp ts, boolean[] ackArr, String text) {
+    public OrderedMessage(int sender, Timestamp ts, String text , boolean[] ackArr) {
         super(sender);
         this.text = text;
         ack = false;
         timestamp = ts;
         ackArray = ackArr;
+      
     }
 
     /**
      *  Constructor for acknowledgement object of class OrderedMessage
      *
      */    
-    public OrderedMessage(int sender, Timestamp originalTimestamp, int originalSender) {
+    public OrderedMessage(int sender, Timestamp originalTimestamp, boolean[] ackArr, int ackSender) {
         super(sender);
-        orgId = originalSender;
+        this.ackSender = ackSender;
         timestamp = originalTimestamp;
         ack = true;
+        ackArray = ackArr;
     }
     
     /**
@@ -57,6 +59,8 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
      * Returns true if that is the case, otherwise false.
      */
     public boolean isAllAcked(){
+      if(ackArray.length() == 0 )
+        return false;
       for(boolean ack : ackArray) {
         if(!ack)
           return false;
@@ -67,14 +71,31 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     public int getSender() {
         return sender;
     }
-    
-    public int getOriginalSender(){
-        return orgId;
+
+    public int getAckSender(){
+        return ackSender;
     }
 
     public Timestamp getTimeStamp(){
       return timestamp;
     }
+
+    public void setAckIndex(int idx) {
+      ackArray[idx] = true;
+    }
+    public boolean getAckIndex(int idx) {
+      return ackArray[idx];
+    }
+
+    public boolean[] getAckArray(){
+      return ackArray;
+    }
+
+    public void setAckArray(boolean[] arr) {
+    ackArray = arr.clone();
+    }
+
+    
 
     /**
      * Compares two OrderedMessage objects. Breaks ties

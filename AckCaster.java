@@ -27,10 +27,10 @@ public class AckCaster extends Multicaster {
     public void cast(String messagetext) {
       Timestamp ts = new Timestamp(System.currentTimeMillis());
       boolean[] ackArray = ackArrayInit(hosts);
-      int index;
-   // kanske bort   ackArray[id] = true;
+      ackArray[id] = true;
+     
       
-      omsg = new OrderedMessage(id, ts, ackArray, messagetext);
+      omsg = new OrderedMessage(id, ts, messagetext,ackArray);
       deliveryList.add(omsg);
      // deliveryList.sort();
       Collections.sort(deliveryList);
@@ -59,11 +59,50 @@ public class AckCaster extends Multicaster {
      */
     public void basicreceive(int peer, Message message) {      
         OrderedMessage ms = (OrderedMessage) message;
+        int sender;
+        int msgindex = findMessage(ms);
         // On receive, 
         if(ms.isAck()) {
-            
+          sender = ms.getSender();
+          if(msgindex >= 0) 
+            deliveryList.get(msgindex).setAckIndex(sender); 
+          else {
+            ms.setAckIndex(ms.getAckSender());
+            deliveryList.add(ms);
+            Collections.sort(deliveryList);
+          }
+        }
+        else{
+          if(msgindex >= 0){
+            boolean[] arr = deliveryList.remove(msgindex).getAckArray();
+            ms.setAckArray(arr);
+            deliveryList.add(msgindex,ms);
+          }
+          else {
+            deliveryList.add(ms);
+            Collections.sort(deliveryList);
+          }     
+        }
 
-                
+        if(msgindex == 0) {
+          deliveryList.get(0).setAckIndex(id);
+          OrderedMessage msg = deliveryList.get(0);
+         
+          while(msg.isAllAcked() && !deliveryList.isEmpty()){
+            msg = deliveryList.remove(0);
+            mcui.deliver(peer, msg.getText());
+            if(!deliveryList.isEmpty()){
+              msg = deliveryList.get(0);
+              msg.setAckIndex(id);
+            }
+          }
+          if(!deliveryList.isEmpty() && !msg.isAck() && !msg.getAckIndex(id)) {
+            msg.setAckIndex(id);
+            for(boolean acked : msg.getAckArray) {
+              if(!acked)
+                  bcom.basicsend(i, omsg);
+            }
+          }
         }
        
         //mcui.deliver(peer, ((OrderedMessage)message).text);
