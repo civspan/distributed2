@@ -1,6 +1,7 @@
 
 import mcgui.*;
 import java.sql.Timestamp;
+import java.util.*;
 
 /**
  * Message implementation for ExampleCaster.
@@ -59,8 +60,7 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
      * Returns true if that is the case, otherwise false.
      */
     public boolean isAllAcked(){
-      if(ackArray.length() == 0 )
-        return false;
+
       for(boolean ack : ackArray) {
         if(!ack)
           return false;
@@ -95,6 +95,11 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     ackArray = arr.clone();
     }
 
+    public String printMessage() {
+      return ("sender : " + sender + " ack : " + ack + " timestamp : " + timestamp + " ackArray : " + Arrays.toString(ackArray));
+
+}
+
     
 
     /**
@@ -111,10 +116,10 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
                  else
                     return 0; // If timestamp and messages are the same, the objects are equal 
         }
-        if(msg.getTimeStamp().before(this.timestamp))
-            return 1;
-        else
+        if(msg.getTimeStamp().after(this.timestamp))
             return -1;
+        else
+            return 1;
     }
 
 
