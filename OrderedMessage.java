@@ -14,33 +14,46 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     Timestamp timestamp;
     boolean ack;
     int ackSender;
+    int hosts;
     boolean[] ackArray;
-     
-     
+    
+   
     /**
      *  Constructor for message carrying object of class OrderedMessage
      *
      */    
-    public OrderedMessage(int sender, Timestamp ts, String text , boolean[] ackArr) {
+    public OrderedMessage(int sender, Timestamp ts, int hosts, String text) { 
         super(sender);
         this.text = text;
+        this.hosts = hosts;
         ack = false;
         timestamp = ts;
-        ackArray = ackArr;
-      
+        makeAckArray(sender);      
     }
 
     /**
      *  Constructor for acknowledgement object of class OrderedMessage
      *
      */    
-    public OrderedMessage(int sender, Timestamp originalTimestamp, boolean[] ackArr, int ackSender) {
+    public OrderedMessage(int sender, Timestamp originalTimestamp, int hosts, int ackSender) {
         super(sender);
         this.ackSender = ackSender;
+        this.hosts = hosts;
         timestamp = originalTimestamp;
         ack = true;
-        ackArray = ackArr;
     }
+    
+     /**
+     *  Creates an ack array. All elements are false excepts for 
+     *  @param acker The only element set to true in the ack array. 
+     */ 
+    public void makeAckArray(int acker) {
+        ackArray = new boolean[hosts];
+        for(boolean elem : ackArray) 
+            elem = false;
+        ackArray[acker] = true;
+    }
+    
     
     /**
      * Returns the text of the message only. The toString method can
@@ -60,12 +73,11 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
      * Returns true if that is the case, otherwise false.
      */
     public boolean isAllAcked(){
-
-      for(boolean ack : ackArray) {
-        if(!ack)
-          return false;
-      }
-      return true;
+        for(boolean ack : ackArray) {
+            if(!ack)
+                return false;
+        }
+        return true;
     }
 
     public int getSender() {
@@ -77,28 +89,31 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     }
 
     public Timestamp getTimeStamp(){
-      return timestamp;
+        return timestamp;
     }
 
     public void setAckIndex(int idx) {
-      ackArray[idx] = true;
+        System.out.println("size of array: " + ackArray.length + 
+            "\nindex: " + idx);
+        ackArray[idx] = true;
     }
+    
     public boolean getAckIndex(int idx) {
-      return ackArray[idx];
+        return ackArray[idx];
     }
 
     public boolean[] getAckArray(){
-      return ackArray;
+        return ackArray;
     }
 
     public void setAckArray(boolean[] arr) {
-    ackArray = arr.clone();
+        ackArray = arr.clone();
     }
 
     public String printMessage() {
-      return ("sender : " + sender + " ack : " + ack + " timestamp : " + timestamp + " ackArray : " + Arrays.toString(ackArray));
-
-}
+        return ("\nSender: " + sender + "\nis ack: " + ack + "\ntimestamp: " 
+            + timestamp + "\nackArray: " + Arrays.toString(ackArray));
+    }
 
     
 

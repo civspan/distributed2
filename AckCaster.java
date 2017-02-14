@@ -4,19 +4,13 @@ import java.sql.Timestamp;
 import java.util.*;
 
 /**
- * Simple example of how to use the Multicaster interface.
+ * Implementation of Multicaster interface...
  *
- * @author Andreas Larsson &lt;larandr@chalmers.se&gt;
+ * @author Group 9
  */
 public class AckCaster extends Multicaster {
     private OrderedMessage omsg;
     private List<OrderedMessage> deliveryList = new ArrayList<>();
-
-    //private OrderedMessage b = new OrderedMessage(1,t,"",{});
-    //deliveryList.add(a);
-    //deliveryList.add(b);
-    // private List missingList = new ArrayList<OrderedMessage>();
-
 
     /**
      * No initializations needed for this simple one
@@ -29,124 +23,147 @@ public class AckCaster extends Multicaster {
      * The GUI calls this module to multicast a message
      */
     public void cast(String messagetext) {
-        // Timestamp t = new Timestamp(System.currentTimeMillis());
-        // boolean[] p = {true};
-       // OrderedMessage a = new OrderedMessage(1,t,"",p);
-      //deliveryList.add(a);
-      
-     // int r = findMessage(a);
-     // mcui.debug("findmessage: \""+r+"\"");
-      // mcui.debug("printmsg: \""+omsg+"\"");
-      Timestamp ts = new Timestamp(System.currentTimeMillis());
-      boolean[] ackArray = ackArrayInit(hosts);
-      ackArray[id] = true;
+        Timestamp ts = new Timestamp(System.currentTimeMillis());
      
-      
-      omsg = new OrderedMessage(id, ts, messagetext,ackArray);
-      //mcui.debug("printmsg: \""+omsg+"\"");
-      deliveryList.add(omsg);
-      Collections.sort(deliveryList);
-      
-      for(int i=0; i < hosts; i++) {
-          /* Sends to everyone except itself */
-          if(i != id) {
-              bcom.basicsend(i, omsg);
-          }
-      }
-        //mcui.debug("Sent out: \""+messagetext+"\"");
-        //mcui.deliver(id, messagetext, "from myself!");
+        omsg = new OrderedMessage(id, ts, hosts, messagetext); 
+
+        deliveryList.add(omsg);
+        Collections.sort(deliveryList);
+        
+        for(int i=0; i < hosts; i++) {
+            /* Sends to everyone except itself */
+            if(i != id) {
+                bcom.basicsend(i, omsg);
+            }
+        }
     }
     
-
     public void basicreceive(int peer, Message message) {      
-        OrderedMessage ms = (OrderedMessage) message;
+        OrderedMessage ms, ackmsg, firstmsg; 
+        ms = (OrderedMessage) message;
         int sender;
         int msgindex = findMessage(ms);
-        printList();
-        mcui.debug("End of list..\n");
-        //mcui.debug("received msg: \""+ms.getText()+"\"");
-        // On receive, 
+        
+        /* On receive, check if ack */ 
         if(ms.isAck()) {
-          //mcui.debug("received ack: \""+ms.getText()+"\"");
-          sender = ms.getSender();
-          if(msgindex >= 0) {
-            mcui.debug("msg in list");
-            deliveryList.get(msgindex).setAckIndex(sender); 
-          }
-        /* Message is ack but not in list*/
-          else {
-            //mcui.debug("msg NOT in list");
-            ms.setAckIndex(ms.getAckSender());
-            deliveryList.add(ms);
-            Collections.sort(deliveryList);
-          }
+            mcui.debug("Ack received from " + peer );
+            
+            /* Message is ack and corresponding message is in list.
+             * Will set message in list as acked from sender of ack */
+            if(msgindex >= 0) {
+                deliveryList.get(msgindex).setAckIndex( peer );
+                mcui.debug("Got ack from " + peer + " for message from "
+                  + ms.getSender() ); 
+            }
+          /* Message is ack but not in list. Create ack array for this placeholder,
+           * then add to list. Exit. */
+            else {
+                ms.makeAckArray(peer);
+                deliveryList.add(ms);
+                Collections.sort(deliveryList);
+                return;
+            }
         }
+        /* Message is real message */
         else{
-          //mcui.debug("received real msg: \""+ms.getText()+"\"");
-          if(msgindex >= 0){
+               
+            /* Placeholder (ack) message found in list. Extract ack array from placeholder,
+             * replace message ack array with this array, set message sender as acker in new array,
+             * remove placeholder from list and insert message in its place */
+            if(msgindex >= 0){
+                OrderedMessage placeholder = deliveryList.remove(msgindex);
+                if( !(placeholder.isAck()) )
+                    mcui.debug("Mistaking real message for placeholder.." );
+                boolean[] arr = placeholder.getAckArray();
+                printAckArray("Placeholder array:", arr);
+                ms.setAckArray(arr);
+                printAckArray("Placeholder array copied to new:", ms.getAckArray());
+                ms.setAckIndex(peer);
+                printAckArray("Copied array with sender set as acked:", ms.getAckArray());
+                deliveryList.add(msgindex, ms);
+            }
             
-            boolean[] arr = deliveryList.remove(msgindex).getAckArray();
-            ms.setAckArray(arr);
-            deliveryList.add(msgindex,ms);
-          }
-          else {
-            //mcui.debug("length of list is before: \""+deliveryList.size()+"\"");
-            deliveryList.add(ms);
-            Collections.sort(deliveryList);
-            //mcui.debug("length of list is after: \""+deliveryList.size()+"\"");
-          }     
+            /* Real message and not in list. Add to list and sort. Calculate new index in list */
+            else {
+                deliveryList.add(ms);
+                Collections.sort(deliveryList);
+                msgindex = findMessage(ms);
+                mcui.debug("Real message received. It was not found in list, but added. "
+                  + "Message from " + deliveryList.get(0).getSender() + " is first in list");
+                mcui.debug("Its message index is: " + msgindex);
+            }     
         }
-        msgindex = findMessage(ms);
+        
+        
+        /* Message is first in list. Get message object from list. Set ack. */
         if(msgindex == 0) {
-          deliveryList.get(0).setAckIndex(id);
-          OrderedMessage msg = deliveryList.get(0);
-          //mcui.debug("message : \""+msg.getText()+"\"");
-          //mcui.debug("message : \""+msgindex+"\"");
-         
-          while(msg.isAllAcked() && !deliveryList.isEmpty()){
-            msg = deliveryList.remove(0);
-            mcui.deliver(peer, msg.getText());
-            if(!deliveryList.isEmpty()){
-              msg = deliveryList.get(0);
-              msg.setAckIndex(id);
-            }
-          }
-          if(!deliveryList.isEmpty() && !msg.isAck()) {
+            firstmsg = deliveryList.get(0);
+            firstmsg.setAckIndex(id);
+            mcui.debug("Message from " + firstmsg.getSender() + " is first in list");
             
-            //mcui.debug("ackno : ");
-            msg.setAckIndex(id);
-            boolean[] ackArray = ackArrayInit(hosts);
-            ackArray[id] = true;
-            OrderedMessage ackmsg = new OrderedMessage(msg.getSender(),msg.getTimeStamp(),ackArray,id);
-            //mcui.debug("ackmsg is : \""+ackmsg.+"\"");
-            for(int i=0; i < hosts; i++) {
-            /* Sends to everyone except itself */
-              if(i != id) {
-                bcom.basicsend(i, ackmsg);
-              }
+           /* While the list isn't empty and the first message is fully acked,
+            * deliver that message */
+            while( !deliveryList.isEmpty() && firstmsg.isAllAcked() ){
+                firstmsg = deliveryList.remove(0);
+                mcui.deliver(peer, firstmsg.getText());
+                
+                /* If there are messages in the list after delivery 
+                 * look at that message and set as acked */
+                if(!deliveryList.isEmpty()){
+                    firstmsg = deliveryList.get(0);
+                    firstmsg.setAckIndex(id);
+                }
             }
-  
-          }
+            /* There is a real message in the list that is not fully acked. Broadcast acks. */
+            if(!deliveryList.isEmpty() && !firstmsg.isAck()) {
+                mcui.debug("Real message received, should send ack.");
+                
+                /* Broadcast ack to everyone but yourself */
+                broadcastAck(firstmsg);
+             /*   ackmsg = makeAckMessage(firstmsg);
+                for(int i=0; i < hosts; i++) {
+                    if(i != id) {
+                        bcom.basicsend(i, ackmsg);
+                        mcui.debug("Sent ack to " + i );
+                    }
+                } */
+            }
         }
-       
-        //mcui.deliver(peer, ((OrderedMessage)message).text);
+        printList();
     }
     
-    public boolean[] ackArrayInit(int hosts) {
-        boolean[] tmpArray = new boolean[hosts];
-        for(boolean ack : tmpArray)
-          ack = false;
-        return tmpArray;
-    }
 
     public void printList() {
-      for(OrderedMessage ms : deliveryList) {
-         mcui.debug("Listobject : \""+ms.printMessage()+"\"");      
-      }
-
+        int i = 0;
+        for(OrderedMessage ms : deliveryList) {
+             mcui.debug("Listobject: "+ i + " " + ms.printMessage());   
+             i++;   
+        }
+        mcui.debug("-----End of list-----\n");
+    }
+    /**
+     *  Takes a message and returns an ack message for that message
+     *  @param msg The message to acknowledge
+     */
+    public OrderedMessage makeAckMessage(OrderedMessage msg) {
+          OrderedMessage ackmsg = 
+              new OrderedMessage(msg.getSender(), msg.getTimeStamp(), hosts, id);
+          return ackmsg;
     }
 
-
+    /**
+     *  Takes a message and broadcasts an ack message for that message
+     *  @param firstmsg The message to acknowledge
+     */    
+    public void broadcastAck(OrderedMessage firstmsg) {
+        OrderedMessage ackmsg = makeAckMessage(firstmsg);
+        for(int i=0; i < hosts; i++) {
+            if(i != id) {
+                bcom.basicsend(i, ackmsg);
+                mcui.debug("Sent ack to " + i );
+            }
+        }
+    }
 
     /**
      *  Searches the delivery list for a specified message. 
@@ -161,6 +178,10 @@ public class AckCaster extends Multicaster {
             i++;
         }
         return -1;
+    }
+    
+    public void printAckArray(String s, boolean[] arr) {
+        mcui.debug(s + " " + Arrays.toString(arr) );
     }
     
     /**
