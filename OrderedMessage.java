@@ -93,8 +93,8 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     }
 
     public void setAckIndex(int idx) {
-        System.out.println("size of array: " + ackArray.length + 
-            "\nindex: " + idx);
+        //System.out.println("size of array: " + ackArray.length + 
+          //  "\nindex: " + idx);
         ackArray[idx] = true;
     }
     
@@ -111,8 +111,8 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     }
 
     public String printMessage() {
-        return ("\nSender: " + sender + "\nis ack: " + ack + "\ntimestamp: " 
-            + timestamp + "\nackArray: " + Arrays.toString(ackArray));
+        return ("\n + { Sender: " + sender + "\nis ack: " + ack + "\ntimestamp: " 
+            + timestamp + "\nackArray: " + Arrays.toString(ackArray) + "}");
     }
 
     
@@ -123,7 +123,8 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
      */
     @Override
     public int compareTo(OrderedMessage msg) {
-        if( msg.getTimeStamp() == this.timestamp ) {
+
+        if( msg.getTimeStamp().equals(this.timestamp) ) {
             if(msg.getSender() < this.sender) 
               return 1;
             else if(msg.getSender() > this.sender)

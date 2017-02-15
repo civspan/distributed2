@@ -16,7 +16,7 @@ public class AckCaster extends Multicaster {
      * No initializations needed for this simple one
      */
     public void init() {
-        mcui.debug("The network has "+hosts+" hosts!");
+        //mcui.debug("The network has "+hosts+" hosts!");
     }
         
     /**
@@ -44,7 +44,7 @@ public class AckCaster extends Multicaster {
         
         /* On receive, check if ack */ 
         if(omsg.isAck()) {
-            mcui.debug("Ack received from " + peer );
+            //mcui.debug("Ack received from " + peer );
             
             /* Message is ack and corresponding message is in list.
              * Will set message in list as acked from sender of ack */
@@ -56,6 +56,7 @@ public class AckCaster extends Multicaster {
           /* Message is ack but not in list. Create ack array for this placeholder,
            * then add to list. Exit. */
             else {
+                mcui.debug("placeholder created, added to list. ");
                 omsg.makeAckArray(peer);
                 deliveryList.add(omsg);
                 Collections.sort(deliveryList);
@@ -64,14 +65,15 @@ public class AckCaster extends Multicaster {
         }
         /* Message is real message */
         else{
-               
+             
             /* Placeholder (ack) message found in list. Extract ack array from placeholder,
              * replace message ack array with this array, set message sender as acker in new array,
              * remove placeholder from list and insert message in its place */
+
+           
             if(msgindex >= 0){
+                mcui.debug("Real message received, placeholder found. msg has msgindex : " + msgindex );
                 OrderedMessage placeholder = deliveryList.remove(msgindex);
-                if( !(placeholder.isAck()) )
-                    mcui.debug("Mistaking real message for placeholder.." );
                 boolean[] arr = placeholder.getAckArray();
                 printAckArray("Placeholder array:", arr);
                 omsg.setAckArray(arr);
@@ -83,12 +85,14 @@ public class AckCaster extends Multicaster {
             
             /* Real message and not in list. Add to list and sort. Calculate new index in list */
             else {
+                 mcui.debug("Real message received, not in list. msg has msgindex : " + msgindex );                
                 deliveryList.add(omsg);
                 Collections.sort(deliveryList);
                 msgindex = findMessage(omsg);
-                mcui.debug("Real message received. It was not found in list, but added. "
-                  + "Message from " + deliveryList.get(0).getSender() + " is first in list");
-                mcui.debug("Its message index is: " + msgindex);
+                mcui.debug("New index: " + msgindex );
+                //mcui.debug("Real message received. It was not found in list, but added. "
+               //   + "Message from " + deliveryList.get(0).getSender() + " is first in list");
+                //mcui.debug("Its message index is: " + msgindex);
             }     
         }
         
@@ -97,13 +101,15 @@ public class AckCaster extends Multicaster {
         if(msgindex == 0) {
             firstmsg = deliveryList.get(0);
             firstmsg.setAckIndex(id);
-            mcui.debug("Message from " + firstmsg.getSender() + " is first in list");
+            //mcui.debug("Message from " + firstmsg.getSender() + " is first in list");
             
            /* While the list isn't empty and the first message is fully acked,
             * deliver that message */
-            while( !deliveryList.isEmpty() && firstmsg.isAllAcked() ){
+            int a = 0;
+            while( deliveryList.size() != 0 && firstmsg.isAllAcked() && a < 3 ){
+                a++;
                 firstmsg = deliveryList.remove(0);
-                mcui.deliver(peer, firstmsg.getText());
+                mcui.deliver(firstmsg.getSender(), firstmsg.getText());
                 
                 /* If there are messages in the list after delivery 
                  * look at that message and set as acked */
@@ -114,21 +120,22 @@ public class AckCaster extends Multicaster {
             }
             /* There is a real message in the list that is not fully acked. Broadcast acks. */
             if(!deliveryList.isEmpty() && !firstmsg.isAck()) {
-                mcui.debug("Real message received, should send ack.");
+                //mcui.debug("Real message received, should send ack.");
+                firstmsg.setAckIndex(id);
                 broadcastAck(firstmsg);
             }
         }
-        printList();
+        //printList();
     }
     
 
     public void printList() {
         int i = 0;
         for(OrderedMessage ms : deliveryList) {
-             mcui.debug("Listobject: "+ i + " " + ms.printMessage());   
+             //mcui.debug("Listobject: "+ i + " " + ms.printMessage());   
              i++;   
         }
-        mcui.debug("-----End of list-----\n");
+        //mcui.debug("-----End of list-----\n");
     }
     /**
      *  Takes a message and returns an ack message for that message
@@ -149,7 +156,7 @@ public class AckCaster extends Multicaster {
         for(int i=0; i < hosts; i++) {
             if(i != id) {
                 bcom.basicsend(i, ackmsg);
-                mcui.debug("Sent ack to " + i );
+                //mcui.debug("Sent ack to " + i );
             }
         }
     }
@@ -162,15 +169,19 @@ public class AckCaster extends Multicaster {
     public int findMessage(OrderedMessage msg) {
         int i = 0;
         for( OrderedMessage listMsg : deliveryList ) {
-            if ( msg.compareTo(listMsg) == 0 )
+            //mcui.debug("incoming msg : " + msg.printMessage());
+            //mcui.debug("message in list : " + listMsg.printMessage());
+            if ( msg.compareTo(listMsg) == 0 ){
+                //mcui.debug("oooh yeah.. a match!");
                 return i;
+            }
             i++;
         }
         return -1;
     }
     
     public void printAckArray(String s, boolean[] arr) {
-        mcui.debug(s + " " + Arrays.toString(arr) );
+        //mcui.debug(s + " " + Arrays.toString(arr) );
     }
     
     /**
