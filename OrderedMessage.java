@@ -11,7 +11,7 @@ import java.util.*;
 public class OrderedMessage extends Message implements Comparable<OrderedMessage> {
         
     String text;
-    Timestamp timestamp;
+    int timestamp;
     boolean ack;
     int ackSender;
     int hosts;
@@ -22,7 +22,7 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
      *  Constructor for message carrying object of class OrderedMessage
      *
      */    
-    public OrderedMessage(int sender, Timestamp ts, int hosts, String text) { 
+    public OrderedMessage(int sender, int ts, int hosts, String text) { 
         super(sender);
         this.text = text;
         this.hosts = hosts;
@@ -35,7 +35,7 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
      *  Constructor for acknowledgement object of class OrderedMessage
      *
      */    
-    public OrderedMessage(int sender, Timestamp originalTimestamp, int hosts, int ackSender) {
+    public OrderedMessage(int sender, int originalTimestamp, int hosts, int ackSender) {
         super(sender);
         this.ackSender = ackSender;
         this.hosts = hosts;
@@ -88,7 +88,7 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
         return ackSender;
     }
 
-    public Timestamp getTimeStamp(){
+    public int getTimeStamp(){
         return timestamp;
     }
 
@@ -124,7 +124,7 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     @Override
     public int compareTo(OrderedMessage msg) {
 
-        if( msg.getTimeStamp().equals(this.timestamp) ) {
+        if( msg.getTimeStamp() == (this.timestamp) ) {
             if(msg.getSender() < this.sender) 
               return 1;
             else if(msg.getSender() > this.sender)
@@ -132,7 +132,7 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
                  else
                     return 0; // If timestamp and messages are the same, the objects are equal 
         }
-        if(msg.getTimeStamp().after(this.timestamp))
+        if(msg.getTimeStamp() < (this.timestamp))
             return -1;
         else
             return 1;
