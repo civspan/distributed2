@@ -9,7 +9,7 @@ import java.util.*;
  * @author Group 9
  */
 public class AckCaster extends Multicaster {
-    private OrderedMessage omsg;
+    private OrderedMessage omsg, firstmsg;
     private List<OrderedMessage> deliveryList = new ArrayList<>();
 
     /**
@@ -24,7 +24,6 @@ public class AckCaster extends Multicaster {
      */
     public void cast(String messagetext) {
         Timestamp ts = new Timestamp(System.currentTimeMillis());
-     
         omsg = new OrderedMessage(id, ts, hosts, messagetext); 
 
         deliveryList.add(omsg);
@@ -39,13 +38,12 @@ public class AckCaster extends Multicaster {
     }
     
     public void basicreceive(int peer, Message message) {      
-        OrderedMessage ms, ackmsg, firstmsg; 
-        ms = (OrderedMessage) message;
+        omsg = (OrderedMessage) message;
         int sender;
-        int msgindex = findMessage(ms);
+        int msgindex = findMessage(omsg);
         
         /* On receive, check if ack */ 
-        if(ms.isAck()) {
+        if(omsg.isAck()) {
             mcui.debug("Ack received from " + peer );
             
             /* Message is ack and corresponding message is in list.
@@ -53,13 +51,13 @@ public class AckCaster extends Multicaster {
             if(msgindex >= 0) {
                 deliveryList.get(msgindex).setAckIndex( peer );
                 mcui.debug("Got ack from " + peer + " for message from "
-                  + ms.getSender() ); 
+                  + omsg.getSender() ); 
             }
           /* Message is ack but not in list. Create ack array for this placeholder,
            * then add to list. Exit. */
             else {
-                ms.makeAckArray(peer);
-                deliveryList.add(ms);
+                omsg.makeAckArray(peer);
+                deliveryList.add(omsg);
                 Collections.sort(deliveryList);
                 return;
             }
@@ -76,18 +74,18 @@ public class AckCaster extends Multicaster {
                     mcui.debug("Mistaking real message for placeholder.." );
                 boolean[] arr = placeholder.getAckArray();
                 printAckArray("Placeholder array:", arr);
-                ms.setAckArray(arr);
-                printAckArray("Placeholder array copied to new:", ms.getAckArray());
-                ms.setAckIndex(peer);
-                printAckArray("Copied array with sender set as acked:", ms.getAckArray());
-                deliveryList.add(msgindex, ms);
+                omsg.setAckArray(arr);
+                printAckArray("Placeholder array copied to new:", omsg.getAckArray());
+                omsg.setAckIndex(peer);
+                printAckArray("Copied array with sender set as acked:", omsg.getAckArray());
+                deliveryList.add(msgindex, omsg);
             }
             
             /* Real message and not in list. Add to list and sort. Calculate new index in list */
             else {
-                deliveryList.add(ms);
+                deliveryList.add(omsg);
                 Collections.sort(deliveryList);
-                msgindex = findMessage(ms);
+                msgindex = findMessage(omsg);
                 mcui.debug("Real message received. It was not found in list, but added. "
                   + "Message from " + deliveryList.get(0).getSender() + " is first in list");
                 mcui.debug("Its message index is: " + msgindex);
@@ -117,16 +115,7 @@ public class AckCaster extends Multicaster {
             /* There is a real message in the list that is not fully acked. Broadcast acks. */
             if(!deliveryList.isEmpty() && !firstmsg.isAck()) {
                 mcui.debug("Real message received, should send ack.");
-                
-                /* Broadcast ack to everyone but yourself */
                 broadcastAck(firstmsg);
-             /*   ackmsg = makeAckMessage(firstmsg);
-                for(int i=0; i < hosts; i++) {
-                    if(i != id) {
-                        bcom.basicsend(i, ackmsg);
-                        mcui.debug("Sent ack to " + i );
-                    }
-                } */
             }
         }
         printList();
