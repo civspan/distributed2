@@ -11,19 +11,21 @@ import java.util.*;
 public class AckCaster extends Multicaster {
     private OrderedMessage omsg, firstmsg;
     private List<OrderedMessage> deliveryList = new ArrayList<>();
+    int ts;
 
     /**
      * No initializations needed for this simple one
      */
     public void init() {
         //mcui.debug("The network has "+hosts+" hosts!");
+        ts = 0;
     }
         
     /**
      * The GUI calls this module to multicast a message
      */
     public void cast(String messagetext) {
-        Timestamp ts = new Timestamp(System.currentTimeMillis());
+        ts++;
         omsg = new OrderedMessage(id, ts, hosts, messagetext); 
 
         deliveryList.add(omsg);
@@ -37,9 +39,9 @@ public class AckCaster extends Multicaster {
         }
     }
     
-    public void basicreceive(int peer, Message message) {      
+    public void basicreceive(int peer, Message message) {  
+        ts++;    
         omsg = (OrderedMessage) message;
-        int sender;
         int msgindex = findMessage(omsg);
         
         /* On receive, check if ack */ 
