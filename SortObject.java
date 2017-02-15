@@ -6,15 +6,15 @@ public class SortObject implements Comparable<SortObject> {
    int time;
    
    public SortObject(int sender, int time) {
-      time = this.time;
-      sender = this.sender;
+      this.time = time;
+      this.sender = sender;
    }
    
    public int getTime() {
       return time;
    }
    
-    public int getSender() {
+   public int getSender() {
       return sender;
    }
    
@@ -27,7 +27,7 @@ public class SortObject implements Comparable<SortObject> {
                  else
                     return 0; // If timestamp and messages are the same, the objects are equal 
         }
-        if(obj.time > this.time)
+        if(obj.time < this.time)
             return 1;
         else
             return -1;

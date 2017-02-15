@@ -12,7 +12,7 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
         
     String text;
     int timestamp;
-    boolean ack;
+    boolean ack, sentAcks;
     int ackSender;
     int hosts;
     boolean[] ackArray;
@@ -28,7 +28,8 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
         this.hosts = hosts;
         ack = false;
         timestamp = ts;
-        makeAckArray(sender);      
+        makeAckArray(sender);
+        sentAcks = false;      
     }
 
     /**
@@ -87,6 +88,14 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     public int getAckSender(){
         return ackSender;
     }
+    
+    public void sentAcks(){
+        sentAcks = true;
+    }
+    
+    public boolean haveSentAcks(){
+        return sentAcks;
+    }
 
     public int getTimeStamp(){
         return timestamp;
@@ -111,7 +120,20 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     }
 
     public String printMessage() {
-        return ("\n + { Sender: " + sender + "\nis ack: " + ack + "\ntimestamp: " 
+        if(ack) {
+        return ("\n{ Sender: " + sender  + "\nAck sender: " + ackSender +  "\nis ack: " + ack + "\ntimestamp: " 
+            + timestamp + "\nackArray: " + Arrays.toString(ackArray) + "}");
+        }
+        return ("\n{ Sender: " + sender +  "\nis ack: " + ack + "\ntimestamp: " 
+            + timestamp + "\nackArray: " + Arrays.toString(ackArray) + "}");
+    }
+    
+    public String printMessage(int peer) {
+        if(ack) {
+        return ("\n{ Sender: " + sender + "\nTo: " + peer + "\nAck sender: " + ackSender +  "\nis ack: " + ack + "\ntimestamp: " 
+            + timestamp + "\nackArray: " + Arrays.toString(ackArray) + "}");
+        }
+        return ("\n{ Sender: " + sender + "\nTo: " + peer +  "\nis ack: " + ack + "\ntimestamp: " 
             + timestamp + "\nackArray: " + Arrays.toString(ackArray) + "}");
     }
 
@@ -133,9 +155,9 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
                     return 0; // If timestamp and messages are the same, the objects are equal 
         }
         if(msg.getTimeStamp() < (this.timestamp))
-            return -1;
-        else
             return 1;
+        else
+            return -1;
     }
 
 
