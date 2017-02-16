@@ -16,19 +16,13 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     int ackSender;
     int hosts;
     boolean[] ackArray;
-    boolean isCrash = false;
+    boolean isCrashed = false;
     
    
     /**
      *  Constructor for message carrying object of class OrderedMessage
      *
-     */   
-
-    public OrderedMessage(int sender ,boolean isCrash){
-      super(sender);      
-      this.isCrash = isCrash;
-    }
- 
+     */    
     public OrderedMessage(int sender, int ts, int hosts, String text) { 
         super(sender);
         this.text = text;
@@ -51,7 +45,9 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
         ack = true;
     }
 
-
+    public OrderedMessage(boolean isCrashed){
+      this.isCrashed = isCrashed;
+    }
     
      /**
      *  Creates an ack array. All elements are false excepts for 
@@ -95,7 +91,7 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     }
 
     public boolean isCrashed(){
-      return isCrash;
+      return isCrashed;
     }
 
     public int getAckSender(){
