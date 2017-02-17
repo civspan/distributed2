@@ -4,110 +4,165 @@ import java.sql.Timestamp;
 import java.util.*;
 
 /**
- * Simple example of how to use the Multicaster interface.
+ * Implementation of Multicaster interface...
  *
- * @author Andreas Larsson &lt;larandr@chalmers.se&gt;
+ * @author Group 9
  */
 public class AckCaster extends Multicaster {
-    private OrderedMessage omsg;
+    private OrderedMessage omsg, firstmsg;
     private List<OrderedMessage> deliveryList = new ArrayList<>();
-    // private List missingList = new ArrayList<OrderedMessage>();
-
-
+    private List<Integer> crashList = new ArrayList<>();
+    int ts;
+    int currentHosts;
+    
     /**
-     * No initializations needed for this simple one
+     * Initialize logical clock and number of current hosts.
      */
     public void init() {
         mcui.debug("The network has "+hosts+" hosts!");
+        currentHosts = hosts;
+        ts = 0;
     }
         
     /**
      * The GUI calls this module to multicast a message
      */
     public void cast(String messagetext) {
-      Timestamp ts = new Timestamp(System.currentTimeMillis());
-      boolean[] ackArray = ackArrayInit(hosts);
-      ackArray[id] = true;
-     
-      
-      omsg = new OrderedMessage(id, ts, messagetext,ackArray);
-      deliveryList.add(omsg);
-     // deliveryList.sort();
-      Collections.sort(deliveryList);
-      
-      for(int i=0; i < hosts; i++) {
-          /* Sends to everyone except itself */
-          if(i != id) {
-              bcom.basicsend(i, omsg);
-          }
-      }
-        //mcui.debug("Sent out: \""+messagetext+"\"");
-        //mcui.deliver(id, messagetext, "from myself!");
-    }
-    
+        ts++;
+        
+        omsg = new OrderedMessage(id, ts, hosts, messagetext); 
 
-    public void basicreceive(int peer, Message message) {      
-        OrderedMessage ms = (OrderedMessage) message;
-        int sender;
-        int msgindex = findMessage(ms);
-        // On receive, 
-        if(ms.isAck()) {
-          sender = ms.getSender();
-          if(msgindex >= 0) 
-            deliveryList.get(msgindex).setAckIndex(sender); 
-          else {
-            ms.setAckIndex(ms.getAckSender());
-            deliveryList.add(ms);
-            Collections.sort(deliveryList);
-          }
-        }
-        else{
-          if(msgindex >= 0){
-            boolean[] arr = deliveryList.remove(msgindex).getAckArray();
-            ms.setAckArray(arr);
-            deliveryList.add(msgindex,ms);
-          }
-          else {
-            deliveryList.add(ms);
-            Collections.sort(deliveryList);
-          }     
-        }
-
-        if(msgindex == 0) {
-          deliveryList.get(0).setAckIndex(id);
-          OrderedMessage msg = deliveryList.get(0);
-         
-          while(msg.isAllAcked() && !deliveryList.isEmpty()){
-            msg = deliveryList.remove(0);
-            mcui.deliver(peer, msg.getText());
-            if(!deliveryList.isEmpty()){
-              msg = deliveryList.get(0);
-              msg.setAckIndex(id);
-            }
-          }
-          if(!deliveryList.isEmpty() && !msg.isAck() && !msg.getAckIndex(id)) {
-            
-
-            msg.setAckIndex(id);
-            OrderedMessage ackmsg = new OrderedMessage(msg.getSender(),msg.getTimeStamp(),ackArray,id);
-            for(int i=0; i < hosts; i++) {
+        deliveryList.add(omsg);
+        Collections.sort(deliveryList);
+        
+        for(int i=0; i < hosts; i++) {
             /* Sends to everyone except itself */
-              if(i != id) {
-                bcom.basicsend(i, ackmsg);
-              }
+            if(i != id && !crashList.contains(i)) {
+                  bcom.basicsend(i, omsg);
             }
-  
-          }
         }
-       
-        //mcui.deliver(peer, ((OrderedMessage)message).text);
     }
     
-    public boolean[] ackArrayInit(int hosts) {
-        boolean[] tmpArray = new boolean[hosts];
-        for(boolean ack : tmpArray)
-          ack = false;
-        return tmpArray;
+    public void basicreceive(int peer, Message message) {  
+        omsg = (OrderedMessage) message;
+        int msgindex = findMessage(omsg);
+          /* On receive, check if ack */ 
+        if(!omsg.isCrashed() && omsg.isAck()) {
+            //mcui.debug("Ack received from " + peer );
+            
+            /* Message is ack and corresponding message is in list.
+             * Will set message in list as acked from sender of ack */
+            if(msgindex >= 0) {
+                deliveryList.get(msgindex).setAckIndex( peer );
+                crashedAcks(deliveryList.get(msgindex));
+            }
+          /* Message is ack but not in list. Create ack array for this placeholder,
+           * then add to list. Exit. */
+            else {
+
+                omsg.makeAckArray(peer);
+                deliveryList.add(omsg);
+                Collections.sort(deliveryList);
+                return;
+            }
+        }
+        /* Message is real message */
+        else if(!omsg.isCrashed()){
+              ts++; 
+                 
+            /* Placeholder (ack) message found in list. Extract ack array from placeholder,
+             * replace message ack array with this array, set message sender as acker in new array,
+             * remove placeholder from list and insert message in its place */
+            if(msgindex >= 0){
+                OrderedMessage placeholder = deliveryList.remove(msgindex);
+                boolean[] arr = placeholder.getAckArray();
+                omsg.setAckArray(arr);
+                omsg.setAckIndex(peer);
+                crashedAcks(omsg);
+                deliveryList.add(msgindex, omsg);
+            }
+            
+            /* Real message and not in list. Add to list and sort. Calculate new index in list */
+            else {
+                deliveryList.add(omsg);
+                Collections.sort(deliveryList);
+                msgindex = findMessage(omsg);
+            }     
+        }
+        
+      /*  Get message object from list. Set ack. */
+        if(!deliveryList.isEmpty()) {
+          firstmsg = deliveryList.get(0);
+          firstmsg.setAckIndex(id);
+          crashedAcks(firstmsg);
+                
+           /* While the list isn't empty and the first message is fully acked,
+            * deliver that message */
+            while( deliveryList.size() != 0 && firstmsg.isAllAcked() ){
+                
+                /* If I haven't sent acks for this message, and I'm not the original sender
+                 * of the message - broadcast acks */
+                if( !(firstmsg.haveSentAcks() || firstmsg.getSender() == id) ) {
+                    broadcastAck(firstmsg);
+                    firstmsg.sentAcks();
+                }    
+                firstmsg = deliveryList.remove(0);
+                mcui.deliver(firstmsg.getSender(), firstmsg.getText());
+                
+                /* If there are messages in the list after delivery 
+                 * look at that message and set as acked */
+                if(!deliveryList.isEmpty()){
+                    firstmsg = deliveryList.get(0);
+                    firstmsg.setAckIndex(id);
+                    crashedAcks(firstmsg);
+                }
+            }
+            
+            /* There is a real message in the list that is not fully acked -  
+             * that I did not send! - that isn't an ack - 
+             * that I haven't already acked -> broadcast acks. */
+            if(!(deliveryList.isEmpty() || firstmsg.isAck() || 
+                firstmsg.getSender() == id || firstmsg.haveSentAcks()) ) {
+                firstmsg.sentAcks();
+                broadcastAck(firstmsg);
+            }
+        }
+    }
+    
+    /**
+     *  Debugging method. Prints the delivery list.
+     */
+    public void printList() {
+        int i = 0;
+        for(OrderedMessage ms : deliveryList) {
+             mcui.debug("Listobject: "+ i + " " + ms.printMessage());   
+             i++;   
+        }
+        mcui.debug("-----End of list-----\n");
+    }
+    
+    
+    /**
+     *  Takes a message and returns an ack message for that message
+     *  @param msg The message to acknowledge
+     */
+    public OrderedMessage makeAckMessage(OrderedMessage msg) {
+          OrderedMessage ackmsg = 
+              new OrderedMessage(msg.getSender(), msg.getTimeStamp(), hosts, id);
+          return ackmsg;
+    }
+
+    /**
+     *  Takes a message and broadcasts an ack message for that message
+     *  @param firstmsg The message to acknowledge
+     */    
+    public void broadcastAck(OrderedMessage firstmsg) {
+        OrderedMessage ackmsg = makeAckMessage(firstmsg);
+        for(int i=0; i < hosts; i++) {
+            if(i != id && !crashList.contains(i)) {
+                bcom.basicsend(i, ackmsg);
+            }
+        }
     }
 
     /**
@@ -125,6 +180,21 @@ public class AckCaster extends Multicaster {
         return -1;
     }
     
+    public void printAckArray(String s, boolean[] arr) {
+        mcui.debug(s + " " + Arrays.toString(arr) );
+    }
+    
+    /**
+     *  Traverses the list of crashed peers and acks the  
+     *  supplied message on their behalf
+     *  @param msg  The message to ack on behalf of the crashed peers
+     */
+    public void crashedAcks(OrderedMessage msg) {
+        for(int crashed : crashList){
+            msg.setAckIndex(crashed);
+        }
+    }
+    
     /**
      * Signals that a peer is down and has been down for a while to
      * allow for messages taking different paths from this peer to
@@ -132,7 +202,20 @@ public class AckCaster extends Multicaster {
      * @param peer	The dead peer
      */
     public void basicpeerdown(int peer) {
+        currentHosts -= 1;
+        OrderedMessage omsg = new OrderedMessage(id,true); 
+        crashList.add(peer);
+        bcom.basicsend(id, omsg);
+        int i = 0;
+        /* Removes real messages sent by crashed processes from delivery list */
+        for(OrderedMessage msg : deliveryList) {
+            if(msg.getSender() == peer && !msg.isAck())
+                deliveryList.remove(i);
+            i++;
+        }   
         mcui.debug("Peer "+peer+" has been dead for a while now!");
+        mcui.debug("There were " + hosts + " hosts. Now there are " + currentHosts);
+      
     }
     
 }

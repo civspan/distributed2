@@ -14,8 +14,9 @@ public class AckCaster extends Multicaster {
     private List<Integer> crashList = new ArrayList<>();
     int ts;
     int currentHosts;
+    
     /**
-     * No initializations needed for this simple one
+     * Initialize logical clock and number of current hosts.
      */
     public void init() {
         mcui.debug("The network has "+hosts+" hosts!");
@@ -38,28 +39,22 @@ public class AckCaster extends Multicaster {
             /* Sends to everyone except itself */
             if(i != id && !crashList.contains(i)) {
                   bcom.basicsend(i, omsg);
-          //      mcui.debug("I just sent this message: " + omsg.printMessage(i));
-           //     mcui.debug("Done sending!\n");
             }
         }
     }
     
     public void basicreceive(int peer, Message message) {  
-       
         omsg = (OrderedMessage) message;
         int msgindex = findMessage(omsg);
-     //   if(!omsg.isCrashed()) {
-          /* On receive, check if ack */ 
+        
+        /* On receive, check if ack */ 
         if(!omsg.isCrashed() && omsg.isAck()) {
-            //mcui.debug("Ack received from " + peer );
             
             /* Message is ack and corresponding message is in list.
              * Will set message in list as acked from sender of ack */
             if(msgindex >= 0) {
                 deliveryList.get(msgindex).setAckIndex( peer );
                 crashedAcks(deliveryList.get(msgindex));
-         //       mcui.debug("Got ack from " + peer + " for message from "
-          //        + omsg.getSender() ); 
             }
           /* Message is ack but not in list. Create ack array for this placeholder,
            * then add to list. Exit. */
@@ -68,19 +63,16 @@ public class AckCaster extends Multicaster {
                 omsg.makeAckArray(peer);
                 deliveryList.add(omsg);
                 Collections.sort(deliveryList);
-              //  mcui.debug("placeholder created, added to list: ");
-              //  mcui.debug(omsg.printMessage());
                 return;
             }
         }
         /* Message is real message */
         else if(!omsg.isCrashed()){
-              ts++;    
+              ts++; 
+                 
             /* Placeholder (ack) message found in list. Extract ack array from placeholder,
              * replace message ack array with this array, set message sender as acker in new array,
              * remove placeholder from list and insert message in its place */
-
-           
             if(msgindex >= 0){
                 OrderedMessage placeholder = deliveryList.remove(msgindex);
                 boolean[] arr = placeholder.getAckArray();
@@ -96,51 +88,51 @@ public class AckCaster extends Multicaster {
                 Collections.sort(deliveryList);
                 msgindex = findMessage(omsg);
             }     
-          
-       }
+        }
         
       /*  Get message object from list. Set ack. */
-      if(!deliveryList.isEmpty()) {
-        firstmsg = deliveryList.get(0);
-        firstmsg.setAckIndex(id);
-        crashedAcks(firstmsg);
-              
-       /* While the list isn't empty and the first message is fully acked,
-        * deliver that message */
-        while( deliveryList.size() != 0 && firstmsg.isAllAcked() ){
+        if(!deliveryList.isEmpty()) {
+          firstmsg = deliveryList.get(0);
+          firstmsg.setAckIndex(id);
+          crashedAcks(firstmsg);
+                
+           /* While the list isn't empty and the first message is fully acked,
+            * deliver that message */
+            while( deliveryList.size() != 0 && firstmsg.isAllAcked() ){
+                
+                /* If I haven't sent acks for this message, and I'm not the original sender
+                 * of the message - broadcast acks */
+                if( !(firstmsg.haveSentAcks() || firstmsg.getSender() == id) ) {
+                    broadcastAck(firstmsg);
+                    firstmsg.sentAcks();
+                }   
+                /* Remove the first message in the list and deliver it. */ 
+                firstmsg = deliveryList.remove(0);
+                mcui.deliver(firstmsg.getSender(), firstmsg.getText());
+                
+                /* If there are messages in the list after delivery 
+                 * look at that message and set as acked */
+                if(!deliveryList.isEmpty()){
+                    firstmsg = deliveryList.get(0);
+                    firstmsg.setAckIndex(id);
+                    crashedAcks(firstmsg);
+                }
+            }
             
-            /* If I haven't sent acks for this message, and I'm not the original sender
-             * of the message - broadcast acks */
-            if( !(firstmsg.haveSentAcks() || firstmsg.getSender() == id) ) {
-                broadcastAck(firstmsg);
+            /* There is a real message in the list that is not fully acked -  
+             * that I did not send - that isn't an ack - 
+             * that I haven't already acked -> broadcast acks. */
+            if(!(deliveryList.isEmpty() || firstmsg.isAck() || 
+                firstmsg.getSender() == id || firstmsg.haveSentAcks()) ) {
                 firstmsg.sentAcks();
-            }    
-            firstmsg = deliveryList.remove(0);
-            mcui.deliver(firstmsg.getSender(), firstmsg.getText());
-            
-            /* If there are messages in the list after delivery 
-             * look at that message and set as acked */
-            if(!deliveryList.isEmpty()){
-                firstmsg = deliveryList.get(0);
-                firstmsg.setAckIndex(id);
-                crashedAcks(firstmsg);
+                broadcastAck(firstmsg);
             }
         }
-        
-        /* There is a real message in the list that is not fully acked -  
-         * that I did not send! - that isn't an ack - 
-         * that I haven't already acked -> broadcast acks. */
-        if(!(deliveryList.isEmpty() || firstmsg.isAck() || 
-            firstmsg.getSender() == id || firstmsg.haveSentAcks()) ) {
-            firstmsg.sentAcks();
-            broadcastAck(firstmsg);
-        }
-      }
-  //  printList();
-
     }
     
-
+    /**
+     *  Debugging method. Prints the delivery list.
+     */
     public void printList() {
         int i = 0;
         for(OrderedMessage ms : deliveryList) {
@@ -163,6 +155,7 @@ public class AckCaster extends Multicaster {
 
     /**
      *  Takes a message and broadcasts an ack message for that message
+     *  to all correct peers.  
      *  @param firstmsg The message to acknowledge
      */    
     public void broadcastAck(OrderedMessage firstmsg) {
@@ -170,9 +163,6 @@ public class AckCaster extends Multicaster {
         for(int i=0; i < hosts; i++) {
             if(i != id && !crashList.contains(i)) {
                 bcom.basicsend(i, ackmsg);
-              //  mcui.debug("I just sent this ack: " + ackmsg.printMessage(i));
-              //  mcui.debug("Done sending!\n");
-                //mcui.debug("Sent ack to " + i );
             }
         }
     }
@@ -185,9 +175,8 @@ public class AckCaster extends Multicaster {
     public int findMessage(OrderedMessage msg) {
         int i = 0;
         for( OrderedMessage listMsg : deliveryList ) {
-            if ( msg.compareTo(listMsg) == 0 ){
+            if ( msg.compareTo(listMsg) == 0 )
                 return i;
-            }
             i++;
         }
         return -1;
@@ -196,7 +185,12 @@ public class AckCaster extends Multicaster {
     public void printAckArray(String s, boolean[] arr) {
         mcui.debug(s + " " + Arrays.toString(arr) );
     }
-
+    
+    /**
+     *  Traverses the list of crashed peers and acks the  
+     *  supplied message on their behalf
+     *  @param msg  The message to ack on behalf of the crashed peers
+     */
     public void crashedAcks(OrderedMessage msg) {
         for(int crashed : crashList){
             msg.setAckIndex(crashed);
@@ -211,11 +205,15 @@ public class AckCaster extends Multicaster {
      */
     public void basicpeerdown(int peer) {
         currentHosts -= 1;
+        
+        /* Create a crashmessage and send it to myself.
+         * Now I can wake up and deliver messages not from the dead peer
+         * in my delivery list that are now set as acked from the dead peer. */
         OrderedMessage omsg = new OrderedMessage(id,true); 
         crashList.add(peer);
         bcom.basicsend(id, omsg);
         int i = 0;
-        /* Removes real messages sent by crashed processes from delivery list */
+        /* Removes real messages sent by crashed peer from delivery list */
         for(OrderedMessage msg : deliveryList) {
             if(msg.getSender() == peer && !msg.isAck())
                 deliveryList.remove(i);

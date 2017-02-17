@@ -20,15 +20,19 @@ public class OrderedMessage extends Message implements Comparable<OrderedMessage
     
    
     /**
-     *  Constructor for message carrying object of class OrderedMessage
+     *  Constructor for crash message object of class OrderedMessage
      *
      */   
 
     public OrderedMessage(int sender ,boolean isCrash){
-      super(sender);      
-      this.isCrash = isCrash;
+        super(sender);      
+        this.isCrash = isCrash;
     }
- 
+    
+    /**
+     *  Constructor for message carrying object of class OrderedMessage
+     *
+     */  
     public OrderedMessage(int sender, int ts, int hosts, String text) { 
         super(sender);
         this.text = text;
